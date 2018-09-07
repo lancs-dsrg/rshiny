@@ -1,5 +1,27 @@
+################################# PREAMBLE ###################################
 # Load in data
-load("TVratings.RData")
+library(rvest)
+library(XML)
+library(xml2)
+library(plyr)
+library(magrittr)
+library(rsconnect)
+
+source("getData.R")
+
+#### Read in Data for the App
+url   <- "http://www.imdb.com/chart/toptv/?ref_=nv_tvv_250_3"
+topTV <- read_html(url)
+series.nodes = html_nodes(topTV,'.titleColumn a')
+
+# names of choices of TV shows
+series.names = html_text(series.nodes)
+
+# Links to the episodes
+series.link = sapply(html_attrs(series.nodes),`[[`,'href')
+series.link = paste0("http://www.imdb.com",gsub("(.*)/.*","\\1",series.link))
+
+##############################################################################
 
 # Define UI
 ui = fluidPage(pageWithSidebar(
@@ -9,7 +31,7 @@ ui = fluidPage(pageWithSidebar(
     selectInput(
       inputId = "series",
       label = "Choose a TV Series",
-      choices = unique(as.character(dataM$series.name)),
+      choices = series.names,
       multiple = FALSE
     ),
     uiOutput("minseglen"),
@@ -23,7 +45,10 @@ ui = fluidPage(pageWithSidebar(
 server <- function(input, output) {
   # Get data
   data <- reactive({
-    temp <- dataM[dataM[, 1] == input$series, ]
+    dataM <- readSeries(series.link = series.link[which(series.names==input$series)], series.name = input$series)
+    dataM <- as.data.frame(dataM)
+    dataM[,2]<- as.numeric(as.character(dataM[,2]))
+    return(dataM)
   })
   
   # Minseglen slider bounds
